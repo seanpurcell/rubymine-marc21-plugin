@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<idea-plugin>
+    <id>com.example.marcviewer</id>
+    <name>MARC Viewer</name>
+    <vendor>Example</vendor>
+
+    <description>
+        Recognizes .mrc files and shows a custom parsed view using marc4j.
+    </description>
+
+    <depends>com.intellij.modules.platform</depends>
+
+    <extensions defaultExtensionNs="com.intellij">
+        <fileTypeFactory implementation="com.example.marcviewer.MarcFileTypeFactory"/>
+        <fileEditorProvider implementation="com.example.marcviewer.MarcEditorProvider"/>
+    </extensions>
+</idea-plugin>
