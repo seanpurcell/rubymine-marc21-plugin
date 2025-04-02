@@ -7,13 +7,11 @@ import com.intellij.openapi.util.UserDataHolderBase
 import com.intellij.openapi.vfs.VirtualFile
 import org.marc4j.MarcStreamReader
 import java.awt.BorderLayout
-import java.awt.Desktop
 import java.io.FileInputStream
-import java.net.URI
 import javax.swing.*
+import javax.swing.event.HyperlinkEvent
 
 class MarcEditorProvider : FileEditorProvider, DumbAware {
-
     override fun accept(project: Project, file: VirtualFile): Boolean {
         return file.extension == "mrc"
     }
@@ -32,41 +30,40 @@ class MarcEditor(private val file: VirtualFile) : UserDataHolderBase(), FileEdit
 
     init {
         editorPane.contentType = "text/html"
-        editorPane.isEditable = false
         editorPane.text = parseMarcFile(file.path)
-
-        // Make links clickable
-        editorPane.addHyperlinkListener { e ->
-            if (e.eventType == javax.swing.event.HyperlinkEvent.EventType.ACTIVATED) {
-                Desktop.getDesktop().browse(URI(e.url.toString()))
+        editorPane.isEditable = false
+        editorPane.addHyperlinkListener {
+            if (it.eventType == HyperlinkEvent.EventType.ACTIVATED) {
+                try {
+                    java.awt.Desktop.getDesktop().browse(it.url.toURI())
+                } catch (e: Exception) {
+                    JOptionPane.showMessageDialog(panel, "Failed to open link: ${e.message}")
+                }
             }
         }
-
         panel.add(JScrollPane(editorPane), BorderLayout.CENTER)
     }
 
     private fun parseMarcFile(path: String): String {
         val sb = StringBuilder()
-        sb.append("<html><body style='font-family: monospace; white-space: pre;'>")
+        sb.append("<html><body style='font-family: monospace; background-color: #f4f4f4;'>")
         try {
             val reader = MarcStreamReader(FileInputStream(path))
             var count = 0
             while (reader.hasNext() && count < 25) {
                 val record = reader.next()
                 record.dataFields.forEach { field ->
-                    sb.append("<span style='color:#1565c0; font-weight:bold;'>=${field.tag}</span>  ")
+                    val indicators = ("${field.indicator1}${field.indicator2}").padEnd(2, ' ')
+                    sb.append("<span style='color:blue'>=${field.tag}</span> ")
+                    sb.append("<span style='color:#555'>$indicators</span> ")
                     field.subfields.forEach { sub ->
-                        val safeData = sub.data
-                            .replace("&", "&amp;")
-                            .replace("<", "&lt;")
-                            .replace(">", "&gt;")
-
-                        val content = if (safeData.startsWith("https://")) {
-                            "<a href=\"$safeData\">$safeData</a>"
+                        val data = sub.data.replace("<", "&lt;").replace(">", "&gt;")
+                        val formatted = if (data.startsWith("http://") || data.startsWith("https://")) {
+                            "<a href='${data}'>\$${sub.code}${data}</a>"
                         } else {
-                            safeData
+                            "<span style='color:#333'>\$${sub.code}</span><span style='color:#000'>${data}</span>"
                         }
-                        sb.append("<span style='color:#00acc1;'>\$${sub.code}</span>$content ")
+                        sb.append("$formatted ")
                     }
                     sb.append("<br>")
                 }
@@ -74,10 +71,10 @@ class MarcEditor(private val file: VirtualFile) : UserDataHolderBase(), FileEdit
                 count++
             }
             if (reader.hasNext()) {
-                sb.append("... (only showing first 25 records)<br>")
+                sb.append("<i>... (only showing first 25 records)</i><br>")
             }
         } catch (e: Exception) {
-            sb.append("<span style='color:red;'>Failed to parse MARC file: ${e.message}</span>")
+            sb.append("<span style='color:red'>Failed to parse MARC file: ${e.message}</span>")
         }
         sb.append("</body></html>")
         return sb.toString()
