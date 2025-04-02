@@ -62,7 +62,7 @@ class MarcEditor(private val file: VirtualFile) : UserDataHolderBase(), FileEdit
                         val formatted = if (data.startsWith("http://") || data.startsWith("https://")) {
                             "<a href='${data}'>\$${sub.code}${data}</a>"
                         } else {
-                            "<span style='color:#333'>\$${sub.code}</span><span style='color:#000'>${data}</span>"
+                            "<span style='color:#006400'>\$${sub.code}</span><span style='color:#000'>${data}</span>"
                         }
                         sb.append("$formatted ")
                     }
