@@ -2,17 +2,17 @@ package com.example.marcviewer
 
 import com.intellij.openapi.fileEditor.*
 import com.intellij.openapi.project.Project
+import com.intellij.openapi.project.DumbAware
 import com.intellij.openapi.util.UserDataHolderBase
 import com.intellij.openapi.vfs.VirtualFile
 import org.marc4j.MarcStreamReader
 import java.awt.BorderLayout
+import java.awt.Desktop
 import java.io.FileInputStream
+import java.net.URI
 import javax.swing.*
-import com.intellij.openapi.project.DumbAware
-
 
 class MarcEditorProvider : FileEditorProvider, DumbAware {
-
 
     override fun accept(project: Project, file: VirtualFile): Boolean {
         return file.extension == "mrc"
@@ -28,40 +28,60 @@ class MarcEditorProvider : FileEditorProvider, DumbAware {
 
 class MarcEditor(private val file: VirtualFile) : UserDataHolderBase(), FileEditor {
     private val panel = JPanel(BorderLayout())
-    private val textArea = JTextArea()
+    private val editorPane = JEditorPane()
 
     init {
-        textArea.text = parseMarcFile(file.path)
-        textArea.isEditable = false
-        panel.add(JScrollPane(textArea), BorderLayout.CENTER)
+        editorPane.contentType = "text/html"
+        editorPane.isEditable = false
+        editorPane.text = parseMarcFile(file.path)
+
+        // Make links clickable
+        editorPane.addHyperlinkListener { e ->
+            if (e.eventType == javax.swing.event.HyperlinkEvent.EventType.ACTIVATED) {
+                Desktop.getDesktop().browse(URI(e.url.toString()))
+            }
+        }
+
+        panel.add(JScrollPane(editorPane), BorderLayout.CENTER)
     }
 
     private fun parseMarcFile(path: String): String {
         val sb = StringBuilder()
+        sb.append("<html><body style='font-family: monospace; white-space: pre;'>")
         try {
             val reader = MarcStreamReader(FileInputStream(path))
             var count = 0
             while (reader.hasNext() && count < 25) {
                 val record = reader.next()
                 record.dataFields.forEach { field ->
-                    sb.append("=${field.tag}  ")
+                    sb.append("<span style='color:#1565c0; font-weight:bold;'>=${field.tag}</span>  ")
                     field.subfields.forEach { sub ->
-                        sb.append("$${sub.code}${sub.data} ")
+                        val safeData = sub.data
+                            .replace("&", "&amp;")
+                            .replace("<", "&lt;")
+                            .replace(">", "&gt;")
+
+                        val content = if (safeData.startsWith("https://")) {
+                            "<a href=\"$safeData\">$safeData</a>"
+                        } else {
+                            safeData
+                        }
+                        sb.append("<span style='color:#00acc1;'>\$${sub.code}</span>$content ")
                     }
-                    sb.append("\n")
+                    sb.append("<br>")
                 }
-                sb.append("\n")
+                sb.append("<br>")
                 count++
             }
             if (reader.hasNext()) {
-                sb.append("... (only showing first 25 records)\n")
+                sb.append("... (only showing first 25 records)<br>")
             }
         } catch (e: Exception) {
-            sb.append("Failed to parse MARC file: ${e.message}")
+            sb.append("<span style='color:red;'>Failed to parse MARC file: ${e.message}</span>")
         }
+        sb.append("</body></html>")
         return sb.toString()
     }
-
 
     override fun getComponent(): JComponent = panel
     override fun getPreferredFocusedComponent(): JComponent = panel
@@ -74,7 +94,6 @@ class MarcEditor(private val file: VirtualFile) : UserDataHolderBase(), FileEdit
     override fun addPropertyChangeListener(listener: java.beans.PropertyChangeListener) {}
     override fun removePropertyChangeListener(listener: java.beans.PropertyChangeListener) {}
     override fun getCurrentLocation(): FileEditorLocation? = null
-    override fun getFile(): VirtualFile = file  // ✅ Add this line
+    override fun getFile(): VirtualFile = file
     override fun dispose() {}
 }
-
