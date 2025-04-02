@@ -53,9 +53,10 @@ class MarcEditor(private val file: VirtualFile) : UserDataHolderBase(), FileEdit
             while (reader.hasNext() && count < 25) {
                 val record = reader.next()
                 record.dataFields.forEach { field ->
-                    val indicators = ("${field.indicator1}${field.indicator2}").padEnd(2, ' ')
-                    sb.append("<span style='color:blue'>=${field.tag}</span> ")
-                    sb.append("<span style='color:#555'>$indicators</span> ")
+                    val indicator1 = if (field.indicator1 == ' ') "_" else field.indicator1
+                    val indicator2 = if (field.indicator2 == ' ') "_" else field.indicator2
+                    val indicators = "$indicator1$indicator2"
+                    sb.append("<span style='color:blue'>=${field.tag}</span> <span style='color:#555'>$indicators</span> ")
                     field.subfields.forEach { sub ->
                         val data = sub.data.replace("<", "&lt;").replace(">", "&gt;")
                         val formatted = if (data.startsWith("http://") || data.startsWith("https://")) {
